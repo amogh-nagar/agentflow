@@ -11,7 +11,8 @@ import java.util.*;
    String result=switch(type){
     case "CONSTANT" -> value==null?"":value;
     case "UPPERCASE" -> (upstream==null?"":upstream).toUpperCase(Locale.ROOT);
-    case "LLM" -> ai.complete((value==null?"":value)+"\n"+(upstream==null?"":upstream));
+    case "LLM", "AGENT" -> ai.complete((value==null?"":value)+"\n\nUpstream results:\n"+(upstream==null?"":upstream));
+    case "FAIL_ONCE" -> { if (steps.attempts(run,nodeId) == 1) throw new IllegalStateException("Simulated transient failure (first attempt)"); yield "Recovered successfully on retry"; }
     default -> throw new IllegalArgumentException("Unsupported activity type: "+type);
    };
    steps.finish(run,nodeId,result);return result;

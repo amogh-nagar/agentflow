@@ -5,5 +5,5 @@ public record WorkflowSpec(String name, List<Node> nodes) {
  public record Node(String id, NodeType type, List<String> dependsOn, String value) {
   public Node { dependsOn = dependsOn == null ? List.of() : List.copyOf(dependsOn); }
  }
- public enum NodeType { CONSTANT, UPPERCASE, LLM, APPROVAL }
+ public enum NodeType { CONSTANT, UPPERCASE, LLM, AGENT, FAIL_ONCE, APPROVAL }
 }

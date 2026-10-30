@@ -16,6 +16,7 @@ public class WorkflowController {
  @GetMapping("/runs") public List<RunEntity> runs(){return service.listRuns();}
  @GetMapping("/runs/{id}") public Map<String,Object> status(@PathVariable UUID id){return service.status(id);}
  @GetMapping("/runs/{id}/steps") public List<StepEntity> steps(@PathVariable UUID id){return service.steps(id);}
+ @GetMapping("/runs/{id}/steps/{nodeId}/output") public Map<String,String> fullOutput(@PathVariable UUID id,@PathVariable String nodeId){return Map.of("output",service.fullOutput(id,nodeId));}
  @PostMapping("/runs/{id}/approvals/{nodeId}") public ResponseEntity<Void> approve(@PathVariable UUID id,@PathVariable String nodeId,@RequestBody Approval request){service.approve(id,nodeId,request.approved());return ResponseEntity.noContent().build();}
  public record Approval(boolean approved){}
  @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<Map<String,String>> invalid(IllegalArgumentException ex){return ResponseEntity.badRequest().body(Map.of("error",ex.getMessage()));}

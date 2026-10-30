@@ -17,6 +17,12 @@ import java.util.*;
  private final WorkflowClient temporal;private final DagValidator validator;
  @Value("${agentflow.demo-tenant}") private UUID tenant;
  @Value("${agentflow.temporal.task-queue}") private String queue;
+ public String fullOutput(UUID runId,String nodeId){
+  var run=runs.findByIdAndTenantId(runId,tenant).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Run not found"));
+  var step=steps.findById(new StepEntity.Key(run.id,nodeId)).orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND,"Step not found"));
+  if(step.outputFull==null)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Full output unavailable (possibly created before migration)");
+  return step.outputFull;
+ }
  public WorkflowService(WorkflowRepository w,RunRepository r,StepRepository steps,ObjectMapper m,WorkflowClient t,DagValidator v){workflows=w;runs=r;this.steps=steps;mapper=m;temporal=t;validator=v;}
  public WorkflowEntity create(WorkflowSpec spec){validator.validate(spec);try{return workflows.save(new WorkflowEntity(UUID.randomUUID(),tenant,spec.name(),mapper.writeValueAsString(spec)));}catch(Exception e){throw new IllegalStateException("Could not save workflow",e);}}
  public List<WorkflowEntity> list(){return workflows.findByTenantIdOrderByNameAsc(tenant);}

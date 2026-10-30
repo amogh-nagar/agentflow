@@ -10,7 +10,7 @@ public class ExecutionWorkflowImpl implements ExecutionWorkflow {
  private String state="RUNNING";
  private String pendingApproval=null;
  private final NodeActivities activities=Workflow.newActivityStub(NodeActivities.class,
-  ActivityOptions.newBuilder().setStartToCloseTimeout(Duration.ofSeconds(35))
+  ActivityOptions.newBuilder().setStartToCloseTimeout(Duration.ofSeconds(120))
    .setRetryOptions(RetryOptions.newBuilder().setMaximumAttempts(3).build()).build());
  @Override public Map<String,String> execute(WorkflowSpec spec){
   Map<String,String> outputs=new HashMap<>();
@@ -23,7 +23,7 @@ public class ExecutionWorkflowImpl implements ExecutionWorkflow {
    Map<String,Promise<String>> pending=new LinkedHashMap<>();
    for(var node:ready){
     if(node.type()!=WorkflowSpec.NodeType.APPROVAL){
-     String upstream=node.dependsOn().isEmpty()?"":outputs.get(node.dependsOn().get(0));
+     String upstream=node.dependsOn().stream().map(dep -> "[" + dep + "]\n" + outputs.get(dep)).collect(java.util.stream.Collectors.joining("\n\n"));
      pending.put(node.id(),Async.function(activities::execute,runId,node.id(),node.type().name(),node.value(),upstream));
     }
    }

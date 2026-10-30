@@ -21,6 +21,7 @@ agentflow:
     mode: ${AI_MODE:mock}
     api-key: ${AI_API_KEY:}
     model: ${AI_MODEL:gpt-4o-mini}
+    max-output-tokens: ${AI_MAX_OUTPUT_TOKENS:4000}
     endpoint: ${AI_ENDPOINT:https://api.openai.com/v1/chat/completions}
 management:
   endpoints:

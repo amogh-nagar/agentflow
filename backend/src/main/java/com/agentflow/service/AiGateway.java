@@ -13,6 +13,7 @@ import java.util.Map;
  @Value("${agentflow.ai.api-key:}") private String key;
  @Value("${agentflow.ai.endpoint:https://api.openai.com/v1/chat/completions}") private String endpoint;
  @Value("${agentflow.ai.model:gpt-4o-mini}") private String model;
+ @Value("${agentflow.ai.max-output-tokens:4000}") private int maxOutputTokens;
  public AiGateway(ObjectMapper mapper){this.mapper=mapper;}
  public String complete(String prompt){
   if("mock".equalsIgnoreCase(mode))return "[DEMO AI RESPONSE] "+prompt.substring(0,Math.min(prompt.length(),200));
@@ -20,8 +21,8 @@ import java.util.Map;
   if(key.isBlank())throw new IllegalStateException("AI_API_KEY is required for openai mode");
   if(!endpoint.startsWith("https://"))throw new IllegalArgumentException("AI endpoint must use HTTPS");
   try{
-   String body=mapper.writeValueAsString(Map.of("model",model,"messages",java.util.List.of(Map.of("role","user","content",prompt)),"max_tokens",300));
-   var request=HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(25))
+   String body=mapper.writeValueAsString(Map.of("model",model,"messages",java.util.List.of(Map.of("role","user","content",prompt)),"max_tokens",maxOutputTokens));
+   var request=HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(90))
     .header("Authorization","Bearer "+key).header("Content-Type","application/json")
     .POST(HttpRequest.BodyPublishers.ofString(body)).build();
    var response=client.send(request,HttpResponse.BodyHandlers.ofString());

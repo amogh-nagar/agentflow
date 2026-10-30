@@ -12,9 +12,10 @@ import java.util.UUID;
   var item=repo.findById(key).orElseGet(()->new StepEntity(run,node));
   item.attempts++; item.status="RUNNING";item.startedAt=Instant.now();item.errorMessage=null;repo.save(item);
  }
+ public int attempts(UUID run,String node){return repo.findById(new StepEntity.Key(run,node)).map(s->s.attempts).orElse(0);}
  @Transactional public void finish(UUID run,String node,String output){
   var item=repo.findById(new StepEntity.Key(run,node)).orElseGet(()->new StepEntity(run,node));
-  item.status="COMPLETED";item.outputPreview=output==null?null:output.substring(0,Math.min(500,output.length()));
+  item.status="COMPLETED";item.outputFull=output;item.outputPreview=output==null?null:output.substring(0,Math.min(500,output.length()));
   item.completedAt=Instant.now();repo.save(item);
  }
  @Transactional public void fail(UUID run,String node,Exception e){

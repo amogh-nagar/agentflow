@@ -7,6 +7,8 @@ import java.util.UUID;
  public String status;
  public int attempts;
  @Column(name="output_preview") public String outputPreview;
+ @com.fasterxml.jackson.annotation.JsonIgnore
+ @Column(name="output_full") public String outputFull;
  @Column(name="error_message") public String errorMessage;
  @Column(name="started_at") public Instant startedAt;
  @Column(name="completed_at") public Instant completedAt;

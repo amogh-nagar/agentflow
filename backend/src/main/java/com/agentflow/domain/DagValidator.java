@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
   for(var n:spec.nodes()){
    if(n.id()==null||!n.id().matches("[a-zA-Z][a-zA-Z0-9_-]{0,63}"))throw new IllegalArgumentException("Invalid node id");
    if(n.type()==null)throw new IllegalArgumentException("Node type required");
+   if(n.type()==WorkflowSpec.NodeType.APPROVAL && n.dependsOn().isEmpty())throw new IllegalArgumentException("Approval must depend on an earlier node");
    if(nodes.putIfAbsent(n.id(),n)!=null)throw new IllegalArgumentException("Duplicate node: "+n.id());
   }
   Map<String,Integer> state=new HashMap<>();
