@@ -1,0 +1,44 @@
+{
+  "name": "AI Research Council",
+  "nodes": [
+    {
+      "id": "topic",
+      "type": "CONSTANT",
+      "dependsOn": [],
+      "value": "What are practical tradeoffs between PostgreSQL and MongoDB for workflow metadata?"
+    },
+    {
+      "id": "researcher",
+      "type": "AGENT",
+      "dependsOn": [
+        "topic"
+      ],
+      "value": "Act as a database researcher. Give 3 precise technical considerations."
+    },
+    {
+      "id": "architect",
+      "type": "AGENT",
+      "dependsOn": [
+        "topic"
+      ],
+      "value": "Act as a systems architect. Evaluate consistency, indexing and operational tradeoffs."
+    },
+    {
+      "id": "synthesis",
+      "type": "LLM",
+      "dependsOn": [
+        "researcher",
+        "architect"
+      ],
+      "value": "Merge both perspectives into 5 concise, balanced recommendations. Clearly label uncertainty."
+    },
+    {
+      "id": "approval",
+      "type": "APPROVAL",
+      "dependsOn": [
+        "synthesis"
+      ],
+      "value": "Human review required"
+    }
+  ]
+}
