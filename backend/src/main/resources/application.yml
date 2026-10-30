@@ -1,0 +1,29 @@
+server:
+  port: 8080
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/agentflow}
+    username: ${DATABASE_USERNAME:agentflow}
+    password: ${DATABASE_PASSWORD:agentflow}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+agentflow:
+  temporal:
+    address: ${TEMPORAL_ADDRESS:localhost:7233}
+    namespace: ${TEMPORAL_NAMESPACE:default}
+    task-queue: agentflow-v1
+  demo-tenant: 00000000-0000-0000-0000-000000000001
+  ai:
+    mode: ${AI_MODE:mock}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:gpt-4o-mini}
+    endpoint: ${AI_ENDPOINT:https://api.openai.com/v1/chat/completions}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
