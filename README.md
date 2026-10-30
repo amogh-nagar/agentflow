@@ -21,19 +21,26 @@
 ## Start locally
 
 Terminal 1:
+
 ```bash
 docker compose -f infra/compose.yaml up -d
 ```
+
 Terminal 2 (Temporal dev server):
+
 ```bash
 temporal server start-dev
 ```
+
 Terminal 3:
+
 ```bash
 cd backend
 mvn spring-boot:run
 ```
+
 Terminal 4:
+
 ```bash
 cd frontend
 npm install
@@ -45,6 +52,7 @@ Open http://localhost:5173 (Temporal UI at http://localhost:8233).
 Create the prefilled workflow, select it, click Execute, switch to Executions, then Approve the waiting workflow.
 
 ### API example
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/workflows -H 'Content-Type: application/json' -d '{"name":"Hello","nodes":[{"id":"hello","type":"CONSTANT","dependsOn":[],"value":"Hello AgentFlow"},{"id":"upper","type":"UPPERCASE","dependsOn":["hello"]}]}'
 ```
@@ -66,7 +74,6 @@ The repository structure and files have been generated. Maven and npm dependenci
 ## Architecture
 
 React → Spring Boot API → PostgreSQL definitions + run intents → Temporal → Java activity workers. The API and worker currently share a JVM for local convenience; they can be independently deployed later.
-
 
 ## Milestone 2 improvements
 

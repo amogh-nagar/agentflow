@@ -1,6 +1,7 @@
 # Milestone 2 — deliberately small vertical slice
 
 Implemented in this iteration:
+
 - Queued run records survive API/Temporal dispatch failure. A scheduled retry uses stable Temporal Workflow IDs; duplicate calls retain the same run.
 - Activity step tracking in Postgres (status, attempts, timestamps, truncated output, failure message). `/api/v1/runs/{id}/steps` returns data.
 - `LLM` DAG node using a mock AI provider by default. Optional OpenAI-compatible chat completion using environment variables (never commit keys).
@@ -8,6 +9,7 @@ Implemented in this iteration:
 - DAG tests cover a valid LLM pipeline and cyclic dependency rejection.
 
 ## Limitations (intentionally deferred)
+
 - The recovery loop is best suited to one API deployment; multi-instance claiming/leases and batch scheduling are future work.
 - A start can race the projection update, but stable Temporal IDs prevent two executions with the same run ID.
 - Activity results are limited to a 500-character preview in Postgres. Full results live in Temporal history.
@@ -18,4 +20,5 @@ Implemented in this iteration:
 - Tests are unit-level until Docker/Temporal integration tests are added.
 
 ## Setup
+
 Follow root README. `AI_MODE=mock` works without a key. For real calls set `AI_MODE=openai` and `AI_API_KEY`; optional `AI_MODEL` and `AI_ENDPOINT` (HTTPS only). Use an account with API billing enabled.

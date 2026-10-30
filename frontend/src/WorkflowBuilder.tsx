@@ -1,34 +1,426 @@
-import {useMemo,useState} from 'react';
-import {Plus,Trash2,GitBranch,Code2} from 'lucide-react';
-export type NodeType='CONSTANT'|'UPPERCASE'|'LLM'|'AGENT'|'FAIL_ONCE'|'APPROVAL';
-export type WorkflowNode={id:string;type:NodeType;dependsOn:string[];value?:string};
-export type WorkflowDefinition={name:string;nodes:WorkflowNode[]};
-const TYPES:NodeType[]=['CONSTANT','AGENT','LLM','UPPERCASE','APPROVAL','FAIL_ONCE'];
-const template:WorkflowDefinition={name:'AI Research Council',nodes:[
-{id:'topic',type:'CONSTANT',dependsOn:[],value:'Compare PostgreSQL and MongoDB for workflow metadata.'},
-{id:'researcher',type:'AGENT',dependsOn:['topic'],value:'Research key strengths and limitations. Give 3 concise findings.'},
-{id:'architect',type:'AGENT',dependsOn:['topic'],value:'Evaluate architectural tradeoffs and operational risks.'},
-{id:'synthesis',type:'LLM',dependsOn:['researcher','architect'],value:'Synthesize both agent perspectives into a balanced summary.'},
-{id:'approval',type:'APPROVAL',dependsOn:['synthesis'],value:'Human approval'}]};
-export const researchTemplate=template;
-export const approvalTemplate:WorkflowDefinition={name:'AI Review Approval Demo',nodes:[{id:'input',type:'CONSTANT',dependsOn:[],value:'Review this change'},{id:'review',type:'LLM',dependsOn:['input'],value:'Summarize this in one sentence:'},{id:'approval',type:'APPROVAL',dependsOn:['review'],value:'Human approval'}]};
-function layers(nodes:WorkflowNode[]){const map=new Map(nodes.map(n=>[n.id,n]));const memo=new Map<string,number>();const visit=(id:string,stack=new Set<string>()):number=>{if(memo.has(id))return memo.get(id)!;if(stack.has(id))return 0;const n=map.get(id);if(!n)return 0;stack.add(id);const depth=n.dependsOn.length?1+Math.max(...n.dependsOn.map(x=>visit(x,stack))):0;stack.delete(id);memo.set(id,depth);return depth};nodes.forEach(n=>visit(n.id));return nodes.map((n,i)=>({...n,depth:memo.get(n.id)??0,index:i}));}
-export default function WorkflowBuilder({initial,onSave,onCancel,busy}:{initial?:WorkflowDefinition;onSave:(spec:WorkflowDefinition)=>void;onCancel:()=>void;busy:boolean}){
- const [spec,setSpec]=useState<WorkflowDefinition>(initial??researchTemplate);const [selected,setSelected]=useState(spec.nodes[0]?.id??'');const [raw,setRaw]=useState(false);const [json,setJson]=useState('');const [error,setError]=useState('');
- const graph=useMemo(()=>layers(spec.nodes),[spec.nodes]);const current=spec.nodes.find(n=>n.id===selected);
- const maxDepth=Math.max(0,...graph.map(n=>n.depth));const widths=210,heights=110;const perDepth=Array.from({length:maxDepth+1},(_,depth)=>graph.filter(n=>n.depth===depth));
- const positions=new Map<string,{x:number;y:number}>();perDepth.forEach((items,depth)=>items.forEach((node,i)=>positions.set(node.id,{x:depth*widths+18,y:70+i*heights})));
- const svgW=Math.max(430,(maxDepth+1)*widths+25),svgH=Math.max(285,70+Math.max(...perDepth.map(v=>v.length),1)*heights);
- function update(id:string,patch:Partial<WorkflowNode>){setSpec(s=>({...s,nodes:s.nodes.map(n=>n.id===id?{...n,...patch}:n)}))}
- function add(type:NodeType){const id=(type.toLowerCase()+'_'+(spec.nodes.length+1)).replace(/[^a-z0-9_]/g,'');const node:WorkflowNode={id,type,dependsOn:current?[current.id]:[],value:type==='AGENT'?'Act as a specialist. Analyze the upstream input.':type==='LLM'?'Synthesize the upstream results.':''};setSpec(s=>({...s,nodes:[...s.nodes,node]}));setSelected(id);setError('')}
- function remove(id:string){setSpec(s=>({...s,nodes:s.nodes.filter(n=>n.id!==id).map(n=>({...n,dependsOn:n.dependsOn.filter(d=>d!==id)}))}));setSelected(spec.nodes.find(n=>n.id!==id)?.id??'')}
- function toggleDependency(dep:string){if(!current||current.id===dep)return;update(current.id,{dependsOn:current.dependsOn.includes(dep)?current.dependsOn.filter(x=>x!==dep):[...current.dependsOn,dep]})}
- function save(){try{if(raw){const parsed=JSON.parse(json) as WorkflowDefinition;onSave(parsed)}else onSave(spec)}catch(e){setError('Invalid JSON: '+String(e))}}
- function switchRaw(){if(!raw)setJson(JSON.stringify(spec,null,2));else{try{setSpec(JSON.parse(json));setError('')}catch(e){setError('Invalid JSON: '+String(e));return}}setRaw(!raw)}
- return <div className="builder-overlay"><section className="builder-dialog"><header className="builder-header"><div><h2>Workflow builder</h2><p>Drag a node type onto the canvas, or click to add it after the selected node.</p></div><div className="builder-actions"><button className="secondary" onClick={switchRaw}><Code2 size={15}/> {raw?'Visual':'JSON'}</button><button className="secondary" onClick={onCancel}>Cancel</button><button disabled={busy||!spec.nodes.length} className="primary" onClick={save}>Save workflow</button></div></header>
- {error&&<p className="builder-error">{error}</p>}
- {raw?<textarea className="builder-json" value={json} onChange={e=>setJson(e.target.value)}/>:<div className="builder-layout"><aside className="builder-palette"><label>WORKFLOW NAME</label><input value={spec.name} onChange={e=>setSpec(s=>({...s,name:e.target.value}))}/><label>ADD NODE</label>{TYPES.map(type=><button key={type} draggable onDragStart={e=>e.dataTransfer.setData('agentflow-type',type)} onClick={()=>add(type)}><Plus size={14}/> {type}</button>)}<p className="builder-help">Parallel: give two AI nodes the same dependency, then make the synthesis node depend on both.</p><button className="secondary" onClick={()=>{setSpec(researchTemplate);setSelected('topic')}}>Load research template</button><button className="secondary" onClick={()=>{setSpec(approvalTemplate);setSelected('input')}}>Load approval template</button></aside>
- <div className="builder-canvas" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const t=e.dataTransfer.getData('agentflow-type') as NodeType;if(TYPES.includes(t))add(t)}}><svg width={svgW} height={svgH} viewBox={`0 0 ${svgW} ${svgH}`} role="img" aria-label="Workflow dependency graph"><defs><marker id="agentflow-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6" fill="none" stroke="#8d83e3" strokeWidth="1.3"/></marker></defs>{graph.flatMap(n=>n.dependsOn.map(dep=>{const a=positions.get(dep),b=positions.get(n.id);return a&&b?<path key={`${dep}-${n.id}`} d={`M${a.x+168},${a.y+26} C${a.x+192},${a.y+26} ${b.x-24},${b.y+26} ${b.x-4},${b.y+26}`} stroke="#8d83e3" strokeWidth="1.7" fill="none" markerEnd="url(#agentflow-arrow)"/>:null}))}{graph.map(n=>{const pos=positions.get(n.id)!;return <g key={n.id} onClick={()=>setSelected(n.id)} style={{cursor:'pointer'}}><rect x={pos.x} y={pos.y} rx="10" width="168" height="53" fill={selected===n.id?'#f1efff':'#fff'} stroke={selected===n.id?'#6152ed':'#cbd3e4'} strokeWidth={selected===n.id?2:1}/><text x={pos.x+12} y={pos.y+21} fill="#30374a" fontSize="11" fontWeight="700">{n.id.slice(0,22)}</text><text x={pos.x+12} y={pos.y+39} fill="#7d83a0" fontSize="10">{n.type}</text></g>})}</svg></div>
- <aside className="builder-properties"><label>SELECTED NODE</label>{current?<><strong>{current.id}</strong><label>TYPE</label><select value={current.type} onChange={e=>update(current.id,{type:e.target.value as NodeType})}>{TYPES.map(t=><option key={t}>{t}</option>)}</select><label>INSTRUCTIONS / VALUE</label><textarea value={current.value??''} onChange={e=>update(current.id,{value:e.target.value})}/><label>DEPENDENCIES</label>{spec.nodes.filter(n=>n.id!==current.id).map(n=><label className="dependency" key={n.id}><input type="checkbox" checked={current.dependsOn.includes(n.id)} onChange={()=>toggleDependency(n.id)}/>{n.id}</label>)}<button className="delete-node" onClick={()=>remove(current.id)}><Trash2 size={14}/> Delete node</button></>:<p>Select a node from the canvas.</p>}<p className="builder-help"><GitBranch size={13}/> Backend checks cycles and missing dependencies when you save.</p></aside></div>}
- </section></div>
+import { useMemo, useState } from "react";
+import { Plus, Trash2, GitBranch, Code2 } from "lucide-react";
+export type NodeType =
+  "CONSTANT" | "UPPERCASE" | "LLM" | "AGENT" | "FAIL_ONCE" | "APPROVAL";
+export type WorkflowNode = {
+  id: string;
+  type: NodeType;
+  dependsOn: string[];
+  value?: string;
+};
+export type WorkflowDefinition = { name: string; nodes: WorkflowNode[] };
+const TYPES: NodeType[] = [
+  "CONSTANT",
+  "AGENT",
+  "LLM",
+  "UPPERCASE",
+  "APPROVAL",
+  "FAIL_ONCE",
+];
+const template: WorkflowDefinition = {
+  name: "AI Research Council",
+  nodes: [
+    {
+      id: "topic",
+      type: "CONSTANT",
+      dependsOn: [],
+      value: "Compare PostgreSQL and MongoDB for workflow metadata.",
+    },
+    {
+      id: "researcher",
+      type: "AGENT",
+      dependsOn: ["topic"],
+      value: "Research key strengths and limitations. Give 3 concise findings.",
+    },
+    {
+      id: "architect",
+      type: "AGENT",
+      dependsOn: ["topic"],
+      value: "Evaluate architectural tradeoffs and operational risks.",
+    },
+    {
+      id: "synthesis",
+      type: "LLM",
+      dependsOn: ["researcher", "architect"],
+      value: "Synthesize both agent perspectives into a balanced summary.",
+    },
+    {
+      id: "approval",
+      type: "APPROVAL",
+      dependsOn: ["synthesis"],
+      value: "Human approval",
+    },
+  ],
+};
+export const researchTemplate = template;
+export const approvalTemplate: WorkflowDefinition = {
+  name: "AI Review Approval Demo",
+  nodes: [
+    {
+      id: "input",
+      type: "CONSTANT",
+      dependsOn: [],
+      value: "Review this change",
+    },
+    {
+      id: "review",
+      type: "LLM",
+      dependsOn: ["input"],
+      value: "Summarize this in one sentence:",
+    },
+    {
+      id: "approval",
+      type: "APPROVAL",
+      dependsOn: ["review"],
+      value: "Human approval",
+    },
+  ],
+};
+function layers(nodes: WorkflowNode[]) {
+  const map = new Map(nodes.map((n) => [n.id, n]));
+  const memo = new Map<string, number>();
+  const visit = (id: string, stack = new Set<string>()): number => {
+    if (memo.has(id)) return memo.get(id)!;
+    if (stack.has(id)) return 0;
+    const n = map.get(id);
+    if (!n) return 0;
+    stack.add(id);
+    const depth = n.dependsOn.length
+      ? 1 + Math.max(...n.dependsOn.map((x) => visit(x, stack)))
+      : 0;
+    stack.delete(id);
+    memo.set(id, depth);
+    return depth;
+  };
+  nodes.forEach((n) => visit(n.id));
+  return nodes.map((n, i) => ({ ...n, depth: memo.get(n.id) ?? 0, index: i }));
+}
+export default function WorkflowBuilder({
+  initial,
+  onSave,
+  onCancel,
+  busy,
+}: {
+  initial?: WorkflowDefinition;
+  onSave: (spec: WorkflowDefinition) => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  const [spec, setSpec] = useState<WorkflowDefinition>(
+    initial ?? researchTemplate,
+  );
+  const [selected, setSelected] = useState(spec.nodes[0]?.id ?? "");
+  const [raw, setRaw] = useState(false);
+  const [json, setJson] = useState("");
+  const [error, setError] = useState("");
+  const graph = useMemo(() => layers(spec.nodes), [spec.nodes]);
+  const current = spec.nodes.find((n) => n.id === selected);
+  const maxDepth = Math.max(0, ...graph.map((n) => n.depth));
+  const widths = 210,
+    heights = 110;
+  const perDepth = Array.from({ length: maxDepth + 1 }, (_, depth) =>
+    graph.filter((n) => n.depth === depth),
+  );
+  const positions = new Map<string, { x: number; y: number }>();
+  perDepth.forEach((items, depth) =>
+    items.forEach((node, i) =>
+      positions.set(node.id, { x: depth * widths + 18, y: 70 + i * heights }),
+    ),
+  );
+  const svgW = Math.max(430, (maxDepth + 1) * widths + 25),
+    svgH = Math.max(
+      285,
+      70 + Math.max(...perDepth.map((v) => v.length), 1) * heights,
+    );
+  function update(id: string, patch: Partial<WorkflowNode>) {
+    setSpec((s) => ({
+      ...s,
+      nodes: s.nodes.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+    }));
+  }
+  function add(type: NodeType) {
+    const id = (type.toLowerCase() + "_" + (spec.nodes.length + 1)).replace(
+      /[^a-z0-9_]/g,
+      "",
+    );
+    const node: WorkflowNode = {
+      id,
+      type,
+      dependsOn: current ? [current.id] : [],
+      value:
+        type === "AGENT"
+          ? "Act as a specialist. Analyze the upstream input."
+          : type === "LLM"
+            ? "Synthesize the upstream results."
+            : "",
+    };
+    setSpec((s) => ({ ...s, nodes: [...s.nodes, node] }));
+    setSelected(id);
+    setError("");
+  }
+  function remove(id: string) {
+    setSpec((s) => ({
+      ...s,
+      nodes: s.nodes
+        .filter((n) => n.id !== id)
+        .map((n) => ({ ...n, dependsOn: n.dependsOn.filter((d) => d !== id) })),
+    }));
+    setSelected(spec.nodes.find((n) => n.id !== id)?.id ?? "");
+  }
+  function toggleDependency(dep: string) {
+    if (!current || current.id === dep) return;
+    update(current.id, {
+      dependsOn: current.dependsOn.includes(dep)
+        ? current.dependsOn.filter((x) => x !== dep)
+        : [...current.dependsOn, dep],
+    });
+  }
+  function save() {
+    try {
+      if (raw) {
+        const parsed = JSON.parse(json) as WorkflowDefinition;
+        onSave(parsed);
+      } else onSave(spec);
+    } catch (e) {
+      setError("Invalid JSON: " + String(e));
+    }
+  }
+  function switchRaw() {
+    if (!raw) setJson(JSON.stringify(spec, null, 2));
+    else {
+      try {
+        setSpec(JSON.parse(json));
+        setError("");
+      } catch (e) {
+        setError("Invalid JSON: " + String(e));
+        return;
+      }
+    }
+    setRaw(!raw);
+  }
+  return (
+    <div className="builder-overlay">
+      <section className="builder-dialog">
+        <header className="builder-header">
+          <div>
+            <h2>Workflow builder</h2>
+            <p>
+              Drag a node type onto the canvas, or click to add it after the
+              selected node.
+            </p>
+          </div>
+          <div className="builder-actions">
+            <button className="secondary" onClick={switchRaw}>
+              <Code2 size={15} /> {raw ? "Visual" : "JSON"}
+            </button>
+            <button className="secondary" onClick={onCancel}>
+              Cancel
+            </button>
+            <button
+              disabled={busy || !spec.nodes.length}
+              className="primary"
+              onClick={save}
+            >
+              Save workflow
+            </button>
+          </div>
+        </header>
+        {error && <p className="builder-error">{error}</p>}
+        {raw ? (
+          <textarea
+            className="builder-json"
+            value={json}
+            onChange={(e) => setJson(e.target.value)}
+          />
+        ) : (
+          <div className="builder-layout">
+            <aside className="builder-palette">
+              <label>WORKFLOW NAME</label>
+              <input
+                value={spec.name}
+                onChange={(e) =>
+                  setSpec((s) => ({ ...s, name: e.target.value }))
+                }
+              />
+              <label>ADD NODE</label>
+              {TYPES.map((type) => (
+                <button
+                  key={type}
+                  draggable
+                  onDragStart={(e) =>
+                    e.dataTransfer.setData("agentflow-type", type)
+                  }
+                  onClick={() => add(type)}
+                >
+                  <Plus size={14} /> {type}
+                </button>
+              ))}
+              <p className="builder-help">
+                Parallel: give two AI nodes the same dependency, then make the
+                synthesis node depend on both.
+              </p>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setSpec(researchTemplate);
+                  setSelected("topic");
+                }}
+              >
+                Load research template
+              </button>
+              <button
+                className="secondary"
+                onClick={() => {
+                  setSpec(approvalTemplate);
+                  setSelected("input");
+                }}
+              >
+                Load approval template
+              </button>
+            </aside>
+            <div
+              className="builder-canvas"
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const t = e.dataTransfer.getData("agentflow-type") as NodeType;
+                if (TYPES.includes(t)) add(t);
+              }}
+            >
+              <svg
+                width={svgW}
+                height={svgH}
+                viewBox={`0 0 ${svgW} ${svgH}`}
+                role="img"
+                aria-label="Workflow dependency graph"
+              >
+                <defs>
+                  <marker
+                    id="agentflow-arrow"
+                    markerWidth="7"
+                    markerHeight="7"
+                    refX="6"
+                    refY="3"
+                    orient="auto"
+                  >
+                    <path
+                      d="M0 0 L6 3 L0 6"
+                      fill="none"
+                      stroke="#8d83e3"
+                      strokeWidth="1.3"
+                    />
+                  </marker>
+                </defs>
+                {graph.flatMap((n) =>
+                  n.dependsOn.map((dep) => {
+                    const a = positions.get(dep),
+                      b = positions.get(n.id);
+                    return a && b ? (
+                      <path
+                        key={`${dep}-${n.id}`}
+                        d={`M${a.x + 168},${a.y + 26} C${a.x + 192},${a.y + 26} ${b.x - 24},${b.y + 26} ${b.x - 4},${b.y + 26}`}
+                        stroke="#8d83e3"
+                        strokeWidth="1.7"
+                        fill="none"
+                        markerEnd="url(#agentflow-arrow)"
+                      />
+                    ) : null;
+                  }),
+                )}
+                {graph.map((n) => {
+                  const pos = positions.get(n.id)!;
+                  return (
+                    <g
+                      key={n.id}
+                      onClick={() => setSelected(n.id)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <rect
+                        x={pos.x}
+                        y={pos.y}
+                        rx="10"
+                        width="168"
+                        height="53"
+                        fill={selected === n.id ? "#f1efff" : "#fff"}
+                        stroke={selected === n.id ? "#6152ed" : "#cbd3e4"}
+                        strokeWidth={selected === n.id ? 2 : 1}
+                      />
+                      <text
+                        x={pos.x + 12}
+                        y={pos.y + 21}
+                        fill="#30374a"
+                        fontSize="11"
+                        fontWeight="700"
+                      >
+                        {n.id.slice(0, 22)}
+                      </text>
+                      <text
+                        x={pos.x + 12}
+                        y={pos.y + 39}
+                        fill="#7d83a0"
+                        fontSize="10"
+                      >
+                        {n.type}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+            <aside className="builder-properties">
+              <label>SELECTED NODE</label>
+              {current ? (
+                <>
+                  <strong>{current.id}</strong>
+                  <label>TYPE</label>
+                  <select
+                    value={current.type}
+                    onChange={(e) =>
+                      update(current.id, { type: e.target.value as NodeType })
+                    }
+                  >
+                    {TYPES.map((t) => (
+                      <option key={t}>{t}</option>
+                    ))}
+                  </select>
+                  <label>INSTRUCTIONS / VALUE</label>
+                  <textarea
+                    value={current.value ?? ""}
+                    onChange={(e) =>
+                      update(current.id, { value: e.target.value })
+                    }
+                  />
+                  <label>DEPENDENCIES</label>
+                  {spec.nodes
+                    .filter((n) => n.id !== current.id)
+                    .map((n) => (
+                      <label className="dependency" key={n.id}>
+                        <input
+                          type="checkbox"
+                          checked={current.dependsOn.includes(n.id)}
+                          onChange={() => toggleDependency(n.id)}
+                        />
+                        {n.id}
+                      </label>
+                    ))}
+                  <button
+                    className="delete-node"
+                    onClick={() => remove(current.id)}
+                  >
+                    <Trash2 size={14} /> Delete node
+                  </button>
+                </>
+              ) : (
+                <p>Select a node from the canvas.</p>
+              )}
+              <p className="builder-help">
+                <GitBranch size={13} /> Backend checks cycles and missing
+                dependencies when you save.
+              </p>
+            </aside>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }

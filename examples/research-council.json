@@ -10,34 +10,25 @@
     {
       "id": "researcher",
       "type": "AGENT",
-      "dependsOn": [
-        "topic"
-      ],
+      "dependsOn": ["topic"],
       "value": "Act as a database researcher. Give 3 precise technical considerations."
     },
     {
       "id": "architect",
       "type": "AGENT",
-      "dependsOn": [
-        "topic"
-      ],
+      "dependsOn": ["topic"],
       "value": "Act as a systems architect. Evaluate consistency, indexing and operational tradeoffs."
     },
     {
       "id": "synthesis",
       "type": "LLM",
-      "dependsOn": [
-        "researcher",
-        "architect"
-      ],
+      "dependsOn": ["researcher", "architect"],
       "value": "Merge both perspectives into 5 concise, balanced recommendations. Clearly label uncertainty."
     },
     {
       "id": "approval",
       "type": "APPROVAL",
-      "dependsOn": [
-        "synthesis"
-      ],
+      "dependsOn": ["synthesis"],
       "value": "Human review required"
     }
   ]
